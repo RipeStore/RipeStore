@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>RipeStore — App</title>
+  <meta name="description" content="RipeStore app details">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><a href="index.html">RipeStore</a></div>
+      <div class="actions">
+        <a class="btn no-underline" href="index.html">Back</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div id="hero" class="hero" aria-live="polite"></div>
+
+    <div class="block" style="margin-top:12px">
+      <div class="rows">
+        <div class="row">
+          <div class="label">Version</div>
+          <div class="value">
+            <select id="versionSelect" class="select fullwidth" aria-label="Version"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">Share</div>
+          <div class="value"><input id="copyLinkInput" type="text" readonly></div>
+        </div>
+        <div class="row">
+          <div class="label">Download</div>
+          <div class="value"><a id="downloadBtn" class="download-wide no-underline" href="#" rel="noopener" target="_blank">Download IPA</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="descBlock" class="block" style="margin-top:12px">
+      <div class="rows">
+      <div class="rows">
+        <div class="row">
+          <div class="label">About</div>
+          <div class="value"><div id="desc" class="value"></div></div>
+        </div>
+        <div class="row">
+          <div class="label">Updated</div>
+          <div class="value"><div id="updatedDate" class="small"></div></div>
+        </div>
+      </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="utils.js"></script>
+  <script type="module" src="app_page.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>RipeStore — Sources</title>
+  <meta name="description" content="Manage RipeStore sources">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><a href="index.html">RipeStore</a></div>
+      <div class="actions">
+        <a class="btn no-underline" href="index.html">Home</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="block">
+      <div class="rows">
+        <div class="row">
+          <div class="label">Add Source</div>
+          <div class="value">
+            <input id="newSource" class="input" placeholder="https://example.com/index.json">
+          </div>
+        </div>
+        <div class="row">
+          <div class="label"></div>
+          <div class="value">
+            <button id="addBtn" class="btn">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block" style="margin-top:12px">
+      <div class="rows">
+        <div class="row"><div class="label">Your Sources</div><div class="value small">Tap to remove</div></div>
+        <div id="sourceList" class="rows"></div>
+      </div>
+    </div>
+  </div>
+
+  
+  
+  <script type="module">
+    import { $, $$ } from './utils.js';
+    const KEY='ripe_sources';
+    const DEFAULTS=['https://repository.apptesters.org'];
+    function get(){try{return JSON.parse(localStorage.getItem(KEY))||DEFAULTS}catch(_){return DEFAULTS}}
+    function set(arr){localStorage.setItem(KEY, JSON.stringify(arr))}
+    let selected = null;
+    function render(){
+      const box = $('#sourceList'); box.innerHTML='';
+      get().forEach(url=>{
+        const row = document.createElement('div'); row.className='row';
+        const lab = document.createElement('div'); lab.className='label'; lab.textContent='Source';
+        const val = document.createElement('div'); val.className='value ellipsis'; val.textContent=url;
+        const hint = document.createElement('div'); hint.className='small'; hint.textContent=''; hint.style.color='var(--text-dim)';
+        row.appendChild(lab); row.appendChild(val); row.appendChild(hint);
+        row.addEventListener('click', (e)=>{
+          const list = get();
+          if(selected === url){
+            set(list.filter(x=>x!==url));
+            selected = null;
+            render();
+            return;
+          }
+          selected = url;
+          Array.from(document.querySelectorAll('#sourceList .row')).forEach(r=>r.classList.remove('selected'));
+          Array.from(document.querySelectorAll('#sourceList .row .small')).forEach(h=>h.textContent='');
+          row.classList.add('selected');
+          hint.textContent='Tap again to remove'; hint.style.color='crimson';
+        });
+        box.appendChild(row);
+      });
+    }
+    document.getElementById('addBtn').addEventListener('click', ()=>{
+      const v = document.getElementById('newSource').value.trim();
+      if(!v) return;
+      const list = get();
+      if(!list.includes(v)){ list.push(v); set(list); render(); }
+      document.getElementById('newSource').value='';
+      selected = null;
+    });
+    document.addEventListener('click', (e)=>{
+      if(!e.target.closest('#sourceList')){
+        selected = null;
+        Array.from(document.querySelectorAll('#sourceList .row')).forEach(r=>r.classList.remove('selected'));
+        Array.from(document.querySelectorAll('#sourceList .row .small')).forEach(h=>h.textContent='');
+      }
+    });
+    render();
+  </script>
+</body>
+</html>
+
+

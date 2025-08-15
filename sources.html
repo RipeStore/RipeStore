@@ -6,6 +6,7 @@
   <title>RipeStore — Sources</title>
   <meta name="description" content="Manage RipeStore sources">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
 </head>
 <body>
   <div class="topbar">
@@ -65,7 +66,18 @@
         row.addEventListener('click', (e)=>{
           const list = get();
           if(selected === url){
-            set(list.filter(x=>x!==url));
+            // remove source: update list, clear cache entry and status
+            const newList = list.filter(x=>x!==url);
+            set(newList);
+            // clear cached repo data in localforage and status entry
+            if(window.localforage){
+              try{ localforage.removeItem(url).catch(()=>{}); }catch(e){}
+            }
+            try{
+              const st = JSON.parse(localStorage.getItem('ripe_sources_status')||'{}');
+              delete st[url];
+              localStorage.setItem('ripe_sources_status', JSON.stringify(st));
+            }catch(e){}
             selected = null;
             Array.from(document.querySelectorAll('#sourceList .row')).forEach(r=>r.classList.remove('selected'));
             Array.from(document.querySelectorAll('#sourceList .row .small')).forEach(h=>h.textContent='');

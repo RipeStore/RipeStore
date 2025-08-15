@@ -1,4 +1,5 @@
-// repo-loader.js - production-ready repo fetcher
+
+// repo-loader.js - ES module using global localforage
 localforage.config({ name: 'RipeStore', storeName: 'repos' });
 const CACHE_TTL = 15 * 60 * 1000;
 const DEFAULT_TIMEOUT = 10000;
@@ -11,7 +12,8 @@ function isShortName(s){ return /^[\w-]+$/.test(s); }
 
 export function repoCandidates(input){
   if(!input) return [];
-  let s = input.trim();
+  let s = String(input).trim();
+  if(!s) return [];
   if(isProtocol(s)) return [s];
   if(s.startsWith('//')) s = 'https:' + s;
   if(isGithubRaw(s)) return ['https://' + s.replace(/^github\.com\//i, 'raw.githubusercontent.com/').replace(/\/blob\//,'/')];
@@ -23,44 +25,40 @@ export function repoCandidates(input){
 function fetchWithTimeout(url, ms=DEFAULT_TIMEOUT){
   const controller = new AbortController();
   const id = setTimeout(()=>controller.abort(), ms);
-  return fetch(url, { signal: controller.signal }).finally(()=> clearTimeout(id));
+  return fetch(url, { signal: controller.signal }).finally(()=>clearTimeout(id));
 }
 
-async function tryFetchCandidates(candidates, retries=1, timeout=DEFAULT_TIMEOUT){
+async function tryFetchCandidates(candidates, retries=1){
   for(const candidate of candidates){
-    let attempt = 0;
-    while(attempt<=retries){
+    try {
+      const res = await fetchWithTimeout(candidate, DEFAULT_TIMEOUT);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      // try json
+      const text = await res.text();
       try{
-        const res = await fetchWithTimeout(candidate, timeout);
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const text = await res.text();
-        try{ const data = JSON.parse(text); return { url:candidate, data }; }catch(e){
-          // attempt to extract JSON block
-          const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-          if(m) return { url:candidate, data: JSON.parse(m[0]) };
-          throw new Error('Invalid JSON');
-        }
+        const data = JSON.parse(text);
+        return { url: candidate, data };
       }catch(e){
-        attempt++;
-        if(attempt<=retries){
-          // small backoff
-          await new Promise(r=>setTimeout(r, 300 * attempt));
-          continue;
-        }else{
-          break;
-        }
+        // try to extract JSON block
+        const m = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if(m) return { url: candidate, data: JSON.parse(m[0]) };
+        throw new Error('Invalid JSON');
       }
-    }
-    // try https->http fallback for domain-like urls
-    if(candidate.startsWith('https://') && isDomainLike(candidate.replace(/^https:\/\//,''))){
-      const httpCandidate = candidate.replace(/^https:/, 'http:');
-      try{
-        const res2 = await fetchWithTimeout(httpCandidate, timeout);
-        if(res2.ok){
-          const data = await res2.json();
-          return { url: httpCandidate, data };
-        }
-      }catch(e){}
+    } catch (err) {
+      // try http fallback if https failed and candidate started with https:// and is domain-like
+      if(retries>0 && candidate.startsWith('https://') && isDomainLike(candidate.replace(/^https:\/\//,''))){
+        try {
+          const httpc = candidate.replace(/^https:/,'http:');
+          const res2 = await fetchWithTimeout(httpc, DEFAULT_TIMEOUT);
+          if(res2.ok){
+            const txt = await res2.text();
+            try{ return { url: httpc, data: JSON.parse(txt) }; }catch(e){}
+            const m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+            if(m) return { url: httpc, data: JSON.parse(m[0]) };
+          }
+        } catch(e){}
+      }
+      // otherwise continue to next candidate
     }
   }
   throw new Error('No candidate succeeded');
@@ -78,16 +76,16 @@ function runNext(){
 }
 
 export function enqueueFetch(fn){
-  return new Promise((resolve,reject)=>{
-    queue.push(async ()=>{ try{ const v = await fn(); resolve(v); }catch(e){ reject(e); } });
+  return new Promise((resolve, reject)=>{
+    queue.push(async ()=> {
+      try{ const r = await fn(); resolve(r); }catch(e){ reject(e); }
+    });
     runNext();
   });
 }
 
 export async function fetchRepo(input){
   const candidates = repoCandidates(input);
-  if(!candidates.length) throw new Error('Invalid repo input');
-  // check cache for any candidate
   for(const c of candidates){
     try{
       const cached = await localforage.getItem(c);
@@ -96,10 +94,18 @@ export async function fetchRepo(input){
       }
     }catch(e){}
   }
-  // fetch via queue
-  return enqueueFetch(async ()=>{
+  return enqueueFetch(async ()=> {
     const res = await tryFetchCandidates(candidates, 1);
     try{ await localforage.setItem(res.url, { ts: Date.now(), data: res.data }); }catch(e){}
-    return { ...res, fromCache: false };
+    return { url: res.url, data: res.data, fromCache: false };
   });
+}
+
+export async function clearRepoCache(input){
+  const candidates = repoCandidates(input);
+  for(const c of candidates){
+    try{ await localforage.removeItem(c); }catch(e){}
+  }
+  // also remove any cached item matching input exactly
+  try{ await localforage.removeItem(input); }catch(e){}
 }

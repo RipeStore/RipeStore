@@ -35,9 +35,6 @@
     <div class="footer-space"></div>
   </div>
 
-  
-  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
   <script type="module" src="utils.js"></script>
   <script type="module" src="app.js"></script>
 </body>

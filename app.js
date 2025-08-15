@@ -7,6 +7,20 @@ const KEY='ripe_sources';
 const DEFAULTS=['https://repository.apptesters.org'];
 const BATCH=20; // dynamic incremental loading
 
+const state = { allMerged: [], list: [], rendered: 0, q: '', sort: '' };
+
+function showSkeleton(count = 6){
+  const c = $('#grid');
+  c.innerHTML = '';
+  for(let i=0;i<count;i++){
+    const sk = document.createElement('div');
+    sk.className = 'app-skeleton';
+    c.appendChild(sk);
+  }
+  state.rendered = 0;
+}
+
+
 function getSources(){
   try{ return JSON.parse(localStorage.getItem(KEY))||DEFAULTS }catch(_){ return DEFAULTS }
 }
@@ -128,6 +142,30 @@ function filterAndPrepare(){
   appendBatch();
 }
 
+
+function renderAppsIncrementally(apps){
+  // Quick incremental renderer: append cards for apps as they arrive.
+  if(!Array.isArray(apps) || apps.length===0) return;
+  const grid = $('#grid');
+  // ensure state.list exists
+  state.list = state.list || [];
+  // if no active search, append directly
+  if(!state.q || state.q.trim()===''){
+    apps.forEach(a=>{
+      state.list.push(a);
+      grid.appendChild(buildCard(a));
+      state.rendered = state.rendered + 1 || 1;
+    });
+  }else{
+    // if searching, re-run search and re-render whole list
+    state.allMerged = state.allMerged.concat(apps);
+    const results = searchApps(state.q, 1000);
+    state.list = results;
+    state.rendered = 0;
+    grid.innerHTML = '';
+    appendBatch();
+  }
+}
 function appendBatch(){
   const grid = $('#grid');
   const next = Math.min(state.rendered + BATCH, state.list.length);

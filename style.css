@@ -90,8 +90,8 @@ html,body,.main,.pane,.grid,.card{max-width:100%;overflow-x:hidden}
 }
 .topbar .brand a:hover { transform: translateY(-2px) scale(1.02); }
 /* Animated underline */
-.topbar .brand a::after{ content:''; display:block; height:2px; width:100%; background:currentColor; opacity:.3; transform-origin:left; animation: underline 3s ease-in-out infinite; }
-@keyframes underline{ 0%{transform: scaleX(0)}50%{transform: scaleX(1)}100%{transform: scaleX(0)}}
+.topbar .brand a::after{ content:''; display:block; height:2px; width:38%; background:linear-gradient(90deg,var(--accent),#f6d365); margin-top:6px; transform-origin:left; transform:scaleX(1); opacity:.95; transition:opacity .5s ease, transform .6s ease; }
+50%{transform: scaleX(1)}100%{transform: scaleX(0)}}
 
 /* skeleton shimmer for loading cards */
 .app-skeleton{ height:86px; border-radius:8px; margin:10px 0; background:linear-gradient(90deg,#efefef 25%,#e0e0e0 50%,#efefef 75%); background-size:200% 100%; animation: shimmer 1.4s infinite;}

@@ -133,3 +133,6 @@ start();
   copy.addEventListener('touchstart', async function(e){ e.preventDefault(); try{ await navigator.clipboard.writeText(copy.value); }catch(_){ copy.select(); document.execCommand('copy'); } });
   copy.addEventListener('click', async function(e){ try{ await navigator.clipboard.writeText(copy.value); }catch(_){ try{ copy.select(); document.execCommand('copy'); }catch(e){} } });
 })();
+
+// set share input value
+const sl = document.getElementById('shareLink'); if(sl) sl.value = window.location.href;

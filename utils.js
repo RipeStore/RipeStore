@@ -82,3 +82,5 @@ export function semverCompare(a,b){
   }
   return 0;
 }
+
+export function preferVersionDate(v){ return v?.versionDate || v?.date || null; }

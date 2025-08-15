@@ -75,27 +75,29 @@ async function loadAll(){
   const sources = getSources();
   state.allMerged = [];
   $('#grid').innerHTML = '';
-  showSkeleton(8);
-
-  // start all fetches concurrently, update UI as each resolves
-  const promises = sources.map(src => {
-    return fetchRepo(src).then(res => {
-      const apps = normalizeRepo(res.data, res.url);
+  showSkeleton(12);
+  const statusContainer = $('#sourceStatus');
+  const promises = sources.map(src => (async ()=>{
+    try{
+      const out = await fetchRepo(src);
+      const apps = normalizeRepo(out.data, out.url);
       addApps(apps);
-      // incremental merge by bundle, quick push
       state.allMerged = state.allMerged.concat(apps);
       renderAppsIncrementally(apps);
+      if(statusContainer){
+        const s = document.createElement('div'); s.className='source-status ok'; s.textContent = src; statusContainer.appendChild(s);
+      }
       return { src, ok: true };
-    }).catch(err => {
+    }catch(err){
       console.warn('Failed source', src, err);
-      markSourceError(src, err);
-      return { src, ok: false };
-    });
-  });
+      if(statusContainer){
+        const s = document.createElement('div'); s.className='source-status err'; s.textContent = src; statusContainer.appendChild(s);
+      }
+      return { src, ok: false, err: String(err) };
+    }
+  })());
 
   await Promise.allSettled(promises);
-
-  // final merge/dedupe and sort
   const merged = mergeByBundle(state.allMerged);
   state.allMerged = merged;
   initSearch(state.allMerged);
@@ -189,3 +191,7 @@ window.addEventListener('scroll', ()=>{
 });
 
 loadAll();
+
+function debounce(fn, ms=200){ let id; return (...a)=>{ clearTimeout(id); id = setTimeout(()=>fn(...a), ms); }; }
+const onSearchDebounced = debounce(()=>{ state.q = $('#q').value || ''; filterAndPrepare(); const sc = document.querySelector('.sort-controls'); if(sc) sc.classList.toggle('hidden', !!state.q.trim()); }, 220);
+if($('#q')) $('#q').addEventListener('input', onSearchDebounced);

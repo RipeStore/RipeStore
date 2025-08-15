@@ -9,10 +9,13 @@
   <meta property="og:description" content="Browse and share iOS IPA repos. Mobile-first, Apple-like UI.">
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
 </head>
 <body>
   <div class="topbar">
     <div class="topbar-inner">
+    <div id="sourceStatus" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
       <div class="brand"><a href="index.html" aria-label="Home">RipeStore</a></div>
       <div class="actions">
         <a class="btn no-underline" href="sources.html">Sources</a>
@@ -35,9 +38,6 @@
     <div class="footer-space"></div>
   </div>
 
-  
-  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
   <script type="module" src="utils.js"></script>
   <script type="module" src="app.js"></script>
 </body>

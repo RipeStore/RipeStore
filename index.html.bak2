@@ -16,7 +16,7 @@
   <div class="topbar">
     <div class="topbar-inner">
     <div id="sourceStatus" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
-      <div class="brand"><a href="index.html" aria-label="Home">RipeStore <span id="totalCount"></span></a></div>
+      <div class="brand"><a href="index.html" aria-label="Home">RipeStore</a></div>
       <div class="actions">
         <a class="btn no-underline" href="sources.html">Sources</a>
       </div>
@@ -26,12 +26,12 @@
   <div class="main">
     <div class="controls">
       <input id="search" class="input" placeholder="Search apps, bundles, versions…">
-      <div class="sort-controls"><select id="sort" class="select" aria-label="Sort">
+      <select id="sort" class="select" aria-label="Sort">
         <option value="name-asc">Name A–Z</option>
         <option value="name-desc">Name Z–A</option>
         <option value="version-desc">Newest version</option>
         <option value="version-asc">Oldest version</option>
-      </select></div>
+      </select>
     </div>
 
     <div id="grid" class="grid" role="list"></div>

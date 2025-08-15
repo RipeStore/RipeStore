@@ -1,7 +1,7 @@
 // search.js - Fuse.js wrapper
 const fuseOpts = {
   includeScore: true,
-  threshold: 0.28,
+  threshold: 0.26,
   ignoreLocation: true,
   minMatchCharLength: 2,
   useExtendedSearch: true,
@@ -22,9 +22,10 @@ export function initSearch(apps){
 }
 
 export function addApps(apps){
+  if(!apps || !apps.length) return;
   allApps.push(...apps);
   if(!fuse) fuse = new Fuse(allApps, fuseOpts);
-  else apps.forEach(a => fuse.add(a));
+  apps.forEach(a => fuse.add(a));
 }
 
 export function searchApps(q, limit=50){

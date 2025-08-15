@@ -1,11 +1,11 @@
 Included files:
-- assets/js/repo-loader.js
-- assets/js/search.js
+- repo-loader.js
+- search.js
 
 Add CDN scripts in your index.html:
 <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
-<script src="/assets/js/repo-loader.js"></script>
-<script src="/assets/js/search.js"></script>
+<script src="/repo-loader.js"></script>
+<script src="/search.js"></script>
 
 Call loadRepos(...) to start loading.

@@ -1,8 +1,8 @@
 import { $, $$, fetchJSON, normalizeRepo, ellipsize, semverCompare } from './utils.js';
 
 
-import { fetchRepo } from './repo-loader.js';
-import { initSearch, addApps, searchApps } from './search.js';
+import { fetchRepo } from './assets/js/repo-loader.js';
+import { initSearch, addApps, searchApps } from './assets/js/search.js';
 const KEY='ripe_sources';
 const DEFAULTS=['https://repository.apptesters.org'];
 const BATCH=20; // dynamic incremental loading

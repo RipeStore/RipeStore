@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>RipeStore</title>
+  <meta name="description" content="RipeStore — lightweight, AltStore-compatible repo browser for iOS IPA sources.">
+  <meta property="og:title" content="RipeStore">
+  <meta property="og:description" content="Browse and share iOS IPA repos. Mobile-first, Apple-like UI.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><a href="index.html" aria-label="Home">RipeStore</a></div>
+      <div class="actions">
+        <a class="btn no-underline" href="sources.html">Sources</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="controls">
+      <input id="search" class="input" placeholder="Search apps, bundles, versions…">
+      <select id="sort" class="select" aria-label="Sort">
+        <option value="name-asc">Name A–Z</option>
+        <option value="name-desc">Name Z–A</option>
+        <option value="version-desc">Newest version</option>
+        <option value="version-asc">Oldest version</option>
+      </select>
+    </div>
+
+    <div id="grid" class="grid" role="list"></div>
+    <div class="footer-space"></div>
+  </div>
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
+  <script type="module" src="utils.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,10 +1,10 @@
-
-// search.js - ES module wrapper around Fuse.js (expects global Fuse)
+// search.js - Fuse.js wrapper
 const fuseOpts = {
   includeScore: true,
-  threshold: 0.32,
+  threshold: 0.26,
   ignoreLocation: true,
   minMatchCharLength: 2,
+  useExtendedSearch: true,
   keys: [
     { name: 'name', weight: 0.75 },
     { name: 'developerName', weight: 0.12 },
@@ -12,17 +12,11 @@ const fuseOpts = {
     { name: 'subtitle', weight: 0.05 }
   ]
 };
-
 let fuse = null;
 let allApps = [];
 
 export function initSearch(apps){
   allApps = (apps||[]).slice();
-  if (typeof Fuse === 'undefined') {
-    console.warn('Fuse not found; search will be basic');
-    fuse = null;
-    return null;
-  }
   fuse = new Fuse(allApps, fuseOpts);
   return fuse;
 }
@@ -30,26 +24,13 @@ export function initSearch(apps){
 export function addApps(apps){
   if(!apps || !apps.length) return;
   allApps.push(...apps);
-  if(!fuse){
-    if(typeof Fuse !== 'undefined') fuse = new Fuse(allApps, fuseOpts);
-  } else {
-    apps.forEach(a => fuse.add(a));
-  }
+  if(!fuse) fuse = new Fuse(allApps, fuseOpts);
+  apps.forEach(a => fuse.add(a));
 }
 
-export function searchApps(q, limit=100){
+export function searchApps(q, limit=50){
   q = (q||'').trim();
-  if(!q){
-    return allApps.slice(0, limit);
-  }
-  if(!fuse){
-    // fallback simple substring search
-    const ql = q.toLowerCase();
-    return allApps.filter(a => {
-      const text = ((a.name||'') + ' ' + (a.developerName||'') + ' ' + (a.bundleIdentifier||'')).toLowerCase();
-      return text.includes(ql);
-    }).slice(0, limit);
-  }
+  if(!q) return allApps.slice(0, limit);
   const raw = fuse.search(q, { limit: limit * 2 });
   const qLower = q.toLowerCase();
   const scored = raw.map(r=>{

@@ -1,206 +1,235 @@
+import { $, $$, fetchJSON, normalizeRepo, ellipsize, semverCompare } from './utils.js';
 
-import { $, $$, normalizeRepo, ellipsize, semverCompare } from './utils.js';
-import { fetchRepo, clearRepoCache } from './repo-loader.js';
+
+import { fetchRepo } from './repo-loader.js';
 import { initSearch, addApps, searchApps } from './search.js';
-
-const KEY = 'ripe_sources';
-const STATUS_KEY = 'ripe_sources_status';
-const DEFAULTS = ['https://repository.apptesters.org'];
-const BATCH = 20;
+const KEY='ripe_sources';
+const DEFAULTS=['https://repository.apptesters.org'];
+const BATCH=20; // dynamic incremental loading
 
 const state = { allMerged: [], list: [], rendered: 0, q: '', sort: '' };
 
-function getSources(){
-  try{ return JSON.parse(localStorage.getItem(KEY)) || DEFAULTS; }catch(e){ return DEFAULTS; }
-}
-function setSources(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); }
-
-function showSkeleton(count=6){
-  const c = $('#grid'); c.innerHTML='';
+function showSkeleton(count = 6){
+  const c = $('#grid');
+  c.innerHTML = '';
   for(let i=0;i<count;i++){
-    const sk = document.createElement('div'); sk.className='app-skeleton'; c.appendChild(sk);
+    const sk = document.createElement('div');
+    sk.className = 'app-skeleton';
+    c.appendChild(sk);
   }
+  state.rendered = 0;
 }
 
-function createAppCard(app){
-  const a = document.createElement('a'); a.className='card'; a.setAttribute('role','listitem');
-  a.dataset.bundle = app.bundle || '';
-  const img = document.createElement('img'); img.className='icon'; img.alt = app.name || '';
-  // lazy load via data-src
-  img.dataset.src = app.iconURL || '';
-  img.src = ''; // placeholder blank
-  const meta = document.createElement('div'); meta.className='meta';
-  const title = document.createElement('div'); title.className='title'; title.textContent = app.name || 'Unknown';
-  const dev = document.createElement('div'); dev.className='dev'; dev.textContent = app.developerName || '';
-  meta.appendChild(title); meta.appendChild(dev);
-  a.appendChild(img); a.appendChild(meta);
-  return a;
-}
 
-function lazyLoadImages(){
-  const imgs = document.querySelectorAll('img.icon[data-src]');
-  if('IntersectionObserver' in window){
-    const io = new IntersectionObserver((entries, obs)=>{
-      entries.forEach(ent=>{
-        if(ent.isIntersecting){
-          const img = ent.target;
-          if(img.dataset.src){
-            img.src = img.dataset.src;
-            img.removeAttribute('data-src');
-          }
-          obs.unobserve(img);
-        }
-      });
-    }, { rootMargin:'200px' });
-    imgs.forEach(i=>io.observe(i));
-  } else {
-    imgs.forEach(i=>{ if(i.dataset.src) i.src = i.dataset.src; i.removeAttribute('data-src'); });
-  }
-}
-
-function renderAppsIncrementally(apps){
-  const grid = $('#grid');
-  for(const app of apps){
-    const card = createAppCard(app);
-    grid.appendChild(card);
-  }
-  lazyLoadImages();
-}
-
-function setSourceStatus(src, obj){
-  try{
-    const all = JSON.parse(localStorage.getItem(STATUS_KEY)||'{}');
-    all[src] = obj;
-    localStorage.setItem(STATUS_KEY, JSON.stringify(all));
-  }catch(e){}
-}
-
-async function loadAll(){
-  const sources = getSources();
-  state.allMerged = [];
-  $('#grid').innerHTML = '';
-  showSkeleton(6);
-  // start fetches
-  const promises = sources.map(src => (async ()=>{
-    try{
-      const res = await fetchRepo(src);
-      const apps = normalizeRepo(res.data, res.url);
-      // add source info
-      apps.forEach(a=>a._source = res.url);
-      // push to global merged
-      state.allMerged.push(...apps);
-      addApps(apps);
-      renderAppsIncrementally(apps);
-      setSourceStatus(res.url, { ok:true, lastLoaded: Date.now(), fromCache: !!res.fromCache });
-      return { src: res.url, ok:true };
-    }catch(err){
-      console.warn('Failed source', src, err);
-      setSourceStatus(src, { ok:false, lastError: String(err), lastLoaded: Date.now() });
-      return { src, ok:false, err: String(err) };
-    }
-  })());
-  await Promise.allSettled(promises);
-  // final merge dedupe
-  const merged = mergeByBundle(state.allMerged);
-  state.allMerged = merged;
-  initSearch(state.allMerged);
-  filterAndPrepare();
+function getSources(){
+  try{ return JSON.parse(localStorage.getItem(KEY))||DEFAULTS }catch(_){ return DEFAULTS }
 }
 
 function mergeByBundle(apps){
   const map = new Map();
   for(const a of apps){
-    const key = (a.bundleIdentifier || a.bundle || a.id || a.bundleIdentifier) || Symbol();
-    if(!map.has(key)) map.set(key, Object.assign({}, a, { versions: (a.versions||[]) }));
-    else {
-      const existing = map.get(key);
-      existing.versions = existing.versions.concat(a.versions || []);
-      if(!existing.iconURL && a.iconURL) existing.iconURL = a.iconURL;
-      if(!existing.name && a.name) existing.name = a.name;
+    const b = (a.bundle||'').trim();
+    if(!b){ // keep separate when no bundle
+      const key = Symbol('nobundle'); // ensure uniqueness
+      map.set(key, a);
+      continue;
+    }
+    if(!map.has(b)){
+      map.set(b, { ...a, versions: [...(a.versions||[])] });
+    }else{
+      const acc = map.get(b);
+
+      acc.name = acc.name || a.name;
+      acc.icon = acc.icon || a.icon;
+      acc.dev  = acc.dev  || a.dev;
+      acc.desc = acc.desc || a.desc;
+      const seen = new Set(acc.versions.map(v=>`${v.version}|${v.url}`));
+      for(const v of (a.versions||[])){
+        const id = `${v.version}|${v.url}`;
+        if(!seen.has(id)){ acc.versions.push(v); seen.add(id); }
+      }
+      map.set(b, acc);
     }
   }
-  // dedupe versions
+
   for(const v of map.values()){
     if(Array.isArray(v.versions)){
-      const seen = new Map();
-      v.versions = v.versions.filter(ver=>{
-        const k = (ver.version || '') + '|' + (ver.downloadURL||'');
-        if(seen.has(k)) return false;
-        seen.set(k,true); return true;
-      });
-      v.versions.sort((x,y)=>{
-        const dx = x.versionDate ? Date.parse(x.versionDate) : (x.date ? Date.parse(x.date) : 0);
-        const dy = y.versionDate ? Date.parse(y.versionDate) : (y.date ? Date.parse(y.date) : 0);
-        if(dx && dy) return dy - dx;
-        return semverCompare(y.version, x.version);
-      });
+      v.versions.sort((x,y)=>semverCompare(y.version, x.version));
     }
   }
   return Array.from(map.values());
 }
 
-function filterAndPrepare(){
-  const q = (state.q||'').trim();
-  if(q){
-    state.list = searchApps(q, 1000);
-  } else {
-    state.list = state.allMerged.slice();
+function sortApps(apps, mode){
+  const byNameAsc = (a,b)=>a.name.localeCompare(b.name);
+  const byNameDesc= (a,b)=>b.name.localeCompare(a.name);
+  const newestVerDate = (a)=>{ const d = a.versions?.[0]?.date; return d ? Date.parse(d) : null; }; // versions already newest-first
+  const byVerDesc = (a,b)=>{ const db = newestVerDate(b), da = newestVerDate(a); if(db && da) return db - da; if(db) return 1; if(da) return -1; return semverCompare((b.versions?.[0]?.version||''),(a.versions?.[0]?.version||'')); };
+  const byVerAsc  = (a,b)=>{ const da = newestVerDate(a), db = newestVerDate(b); if(da && db) return da - db; if(da) return -1; if(db) return 1; return semverCompare((a.versions?.[0]?.version||''),(b.versions?.[0]?.version||'')); };
+  switch(mode){
+    case 'name-desc': return apps.sort(byNameDesc);
+    case 'version-desc': return apps.sort(byVerDesc);
+    case 'version-asc': return apps.sort(byVerAsc);
+    default: return apps.sort(byNameAsc);
   }
-  // update total count
-  const tc = document.getElementById('totalCount');
-  if(tc) tc.textContent = String(state.allMerged.length);
-  state.rendered = 0;
+}
+
+function match(app, q){
+  if(!q) return true;
+  q = q.toLowerCase();
+  const text = [
+    app.name, app.bundle, app.dev, app.desc,
+    ...(app.versions||[]).map(v=>v.version)
+  ].filter(Boolean).join(' ').toLowerCase();
+  return text.includes(q);
+}
+
+
+async function loadAll(){
+  const sources = getSources();
+  state.allMerged = [];
   $('#grid').innerHTML = '';
+  showSkeleton(12);
+  const statusContainer = $('#sourceStatus');
+  const promises = sources.map(src => (async ()=>{
+    try{
+      const out = await fetchRepo(src);
+      const apps = normalizeRepo(out.data, out.url);
+      addApps(apps);
+      state.allMerged = state.allMerged.concat(apps);
+      renderAppsIncrementally(apps);
+      if(statusContainer){
+        const s = document.createElement('div'); s.className='source-status ok'; s.textContent = src; statusContainer.appendChild(s);
+      }
+      return { src, ok: true };
+    }catch(err){
+      console.warn('Failed source', src, err);
+      if(statusContainer){
+        const s = document.createElement('div'); s.className='source-status err'; s.textContent = src; statusContainer.appendChild(s);
+      }
+      return { src, ok: false, err: String(err) };
+    }
+  })());
+
+  await Promise.allSettled(promises);
+  const merged = mergeByBundle(state.allMerged);
+  state.allMerged = merged;
+  initSearch(state.allMerged);
+  filterAndPrepare();
+}
+function filterAndPrepare(){
+  const q = state.q.trim();
+  const filtered = state.allMerged.filter(a=>match(a, q));
+  if(q){
+
+    state.list = expandForSearch(filtered);
+  }else{
+    state.list = filtered;
+  }
+
+  if(q){
+    state.list.sort((a,b)=>{
+      const an=a.name.toLowerCase(), bn=b.name.toLowerCase();
+      if(an!==bn) return an<bn?-1:1;
+      const av=a._verEntry?.version||'', bv=b._verEntry?.version||'';
+      return semverCompare(bv, av);
+    });
+  }else{
+    sortApps(state.list, state.sort);
+  }
+  state.rendered = 0;
+  $('#grid').innerHTML='';
   appendBatch();
 }
 
-function appendBatch(){
-  const start = state.rendered;
-  const end = Math.min(state.rendered + BATCH, state.list.length);
-  const slice = state.list.slice(start, end);
-  renderAppsIncrementally(slice);
-  state.rendered = end;
-}
 
-function removeSourceAndCache(url){
-  const list = getSources();
-  const newList = list.filter(x=>x!==url);
-  setSources(newList);
-  // remove cached data and status
-  try{
-    clearRepoCache(url);
-  }catch(e){}
-  try{
-    const st = JSON.parse(localStorage.getItem(STATUS_KEY)||'{}');
-    delete st[url];
-    localStorage.setItem(STATUS_KEY, JSON.stringify(st));
-  }catch(e){}
-  // re-render home maybe
-  loadAll();
-}
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  // search binding and sort hide
-  const qEl = document.getElementById('q');
-  if(qEl){
-    const onInput = debounce(()=>{
-      state.q = qEl.value;
-      const sc = document.querySelector('.sort-controls');
-      if(sc) sc.classList.toggle('hidden', !!state.q.trim());
-      filterAndPrepare();
-    }, 200);
-    qEl.addEventListener('input', onInput);
+function renderAppsIncrementally(apps){
+  // Quick incremental renderer: append cards for apps as they arrive.
+  if(!Array.isArray(apps) || apps.length===0) return;
+  const grid = $('#grid');
+  // ensure state.list exists
+  state.list = state.list || [];
+  // if no active search, append directly
+  if(!state.q || state.q.trim()===''){
+    apps.forEach(a=>{
+      state.list.push(a);
+      grid.appendChild(buildCard(a));
+      state.rendered = state.rendered + 1 || 1;
+    });
+  }else{
+    // if searching, re-run search and re-render whole list
+    state.allMerged = state.allMerged.concat(apps);
+    const results = searchApps(state.q, 1000);
+    state.list = results;
+    state.rendered = 0;
+    grid.innerHTML = '';
+    appendBatch();
   }
-  // wire up remove via custom event from sources page (if that page calls window.removeSource)
-  window.removeSource = removeSourceAndCache;
-  // initial load
-  loadAll();
-  // infinite scroll
-  let ticking = false;
-  window.addEventListener('scroll', ()=>{
-    if(ticking) return; ticking = true;
-    requestAnimationFrame(()=>{ const nearBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 400); if(nearBottom) appendBatch(); ticking=false; });
+}
+function appendBatch(){
+  const grid = $('#grid');
+  const next = Math.min(state.rendered + BATCH, state.list.length);
+  for(let i=state.rendered;i<next;i++){
+    const a = state.list[i];
+    grid.appendChild(buildCard(a));
+  }
+  state.rendered = next;
+}
+
+function buildCard(a){
+  const card = document.createElement('a');
+  card.className='card no-underline';
+  const versionLabel = a._verEntry ? a._verEntry.version : (a.versions?.[0]?.version || '');
+  const link = makeLink(a, versionLabel);
+  card.href = link;
+  card.setAttribute('role','listitem');
+
+  const icon = document.createElement('div'); icon.className='icon-wrap';
+  const img = document.createElement('img'); img.loading='lazy'; img.alt= (a.name||a.bundle) + ' icon'; img.src = a.icon || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  icon.appendChild(img);
+
+  const meta = document.createElement('div'); meta.className='meta';
+  const title= document.createElement('div'); title.className='title ellipsis'; title.textContent = a.name || a.bundle;
+  const sub  = document.createElement('div'); sub.className='sub ellipsis'; sub.textContent = a.dev || a.bundle;
+  const ver  = document.createElement('div'); ver.className='small ellipsis'; ver.textContent = versionLabel ? `Version ${ellipsize(versionLabel, 48)}` : '';
+  const snippet = document.createElement('div'); snippet.className='desc-snippet ellipsis';
+
+  const notes = a._verEntry?.notes || a.desc || '';
+  snippet.textContent = ellipsize(notes, 120);
+
+  meta.appendChild(title); meta.appendChild(sub); meta.appendChild(ver); meta.appendChild(snippet);
+
+  const right = document.createElement('div'); right.className='right';
+  const pill = document.createElement('div'); pill.className='pill'; pill.textContent='View';
+  right.appendChild(pill);
+
+  card.appendChild(icon); card.appendChild(meta); card.appendChild(right);
+  return card;
+}
+
+function makeLink(a, version){
+  const params = new URLSearchParams();
+  params.set('bundle', a.bundle);
+  if(version) params.set('version', version);
+  params.set('repo', a.source);
+  return `app.html?${params.toString()}`;
+}
+
+document.getElementById('search').addEventListener('input', e=>{ state.q = e.target.value; filterAndPrepare(); });
+document.getElementById('sort').addEventListener('change', e=>{ state.sort = e.target.value; filterAndPrepare(); });
+
+let ticking=false;
+window.addEventListener('scroll', ()=>{
+  if(ticking) return; ticking=true;
+  requestAnimationFrame(()=>{
+    const nearBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 400);
+    if(nearBottom) appendBatch();
+    ticking=false;
   });
 });
 
+loadAll();
+
 function debounce(fn, ms=200){ let id; return (...a)=>{ clearTimeout(id); id = setTimeout(()=>fn(...a), ms); }; }
+const onSearchDebounced = debounce(()=>{ state.q = $('#q').value || ''; filterAndPrepare(); const sc = document.querySelector('.sort-controls'); if(sc) sc.classList.toggle('hidden', !!state.q.trim()); }, 220);
+if($('#q')) $('#q').addEventListener('input', onSearchDebounced);

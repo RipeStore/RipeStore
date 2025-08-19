@@ -4,7 +4,7 @@ import { $, $$, fetchJSON, normalizeRepo, ellipsize, semverCompare } from './uti
 import { fetchRepo } from './repo-loader.js';
 import { initSearch, addApps, searchApps } from './search.js';
 const KEY='ripe_sources';
-const DEFAULTS=['https://repository.apptesters.org'];
+const DEFAULTS=['apptesters'];
 const BATCH=20; // dynamic incremental loading
 
 const state = { allMerged: [], list: [], rendered: 0, q: '', sort: '' };
